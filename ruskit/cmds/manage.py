@@ -92,12 +92,13 @@ def migrate(ctx, args):
 
     if args.dst and args.slot is not None:
         try:
-            cluster.migrate_slot(src, dst, args.slot, verbose=args.verbose, multi=args.multi)
+            cluster.migrate_slot(src, dst, args.slot, verbose=args.verbose,
+                                 multi=args.multi)
         except redis.ResponseError as e:
             ctx.abort(str(e))
     elif args.dst:
         count = len(src.slots) if args.count is None else args.count
-        cluster.migrate(src, dst, count)
+        cluster.migrate(src, dst, count, verbose=args.verbose)
     else:
         cluster.migrate_node(src, args.count, income=args.income)
 
