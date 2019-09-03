@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def _scan_keys(node, slot, count=10):
+def _scan_slot(node, slot, count=10):
     while True:
         keys = node.getkeysinslot(slot, count)
         if not keys:
             break
-        for key in keys:
-            yield key
+        yield keys
 
 
 def retry_when_busy_loading(func):
@@ -149,6 +148,18 @@ class ClusterNode(object):
         if replace:
             args = ["REPLACE"]
         return self.execute_command("MIGRATE", host, port, key,
+                                    destination_db, timeout, *args)
+
+    def migrate_multi(self, host, port, keys, destination_db, timeout, copy=False,
+                replace=False):
+        args = []
+        if copy:
+            args = ["COPY"]
+        if replace:
+            args = ["REPLACE"]
+        args.append("KEYS")
+        args.extend(keys)
+        return self.execute_command("MIGRATE", host, port, '',
                                     destination_db, timeout, *args)
 
     def reset(self, hard=False, soft=False):
@@ -567,16 +578,23 @@ class Cluster(object):
             src, dst = (node, src_node) if income else (src_node, node)
             self.migrate(src, dst, count)
 
-    def migrate_slot(self, src, dst, slot, timeout=15000, verbose=True):
+    def migrate_slot(self, src, dst, slot, timeout=15000, verbose=False,
+                     multi=False):
         if self.check_action_stopped():
             raise ActionStopped('Slot migration was successfully stopped')
 
         dst.setslot("IMPORTING", slot, src.name)
         src.setslot("MIGRATING", slot, dst.name)
-        for key in _scan_keys(src, slot):
+        for keys in _scan_slot(src, slot):
             if verbose:
-                echo("Migrating:", key)
-            src.migrate(dst.host, dst.port, key, 0, timeout)
+                for key in keys:
+                    echo("Migrating:", key)
+
+            if multi:
+                src.migrate_multi(dst.host, dst.port, keys, 0, timeout)
+            else:
+                for key in keys:
+                    src.migrate(dst.host, dst.port, key, 0, timeout)
 
         for node in self.masters:
             node.setslot("NODE", slot, dst.name)

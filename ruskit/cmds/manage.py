@@ -78,6 +78,9 @@ def delete(args):
 @cli.argument("-s", "--slot", type=int)
 @cli.argument("-c", "--count", type=int)
 @cli.argument("-i", "--income", action="store_true")
+@cli.argument("-m", "--multi", action="store_true",
+              help="migrate multiple keys with pipeline")
+@cli.argument("--verbose", action="store_true")
 @timeout_argument
 @cli.pass_ctx
 def migrate(ctx, args):
@@ -89,7 +92,7 @@ def migrate(ctx, args):
 
     if args.dst and args.slot is not None:
         try:
-            cluster.migrate_slot(src, dst, args.slot, verbose=True)
+            cluster.migrate_slot(src, dst, args.slot, verbose=args.verbose, multi=args.multi)
         except redis.ResponseError as e:
             ctx.abort(str(e))
     elif args.dst:
